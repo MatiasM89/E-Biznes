@@ -1,11 +1,12 @@
-name := """ProductControl"""
-organization := "ebiznes"
+name := "productcontrol"
 
 version := "1.0-SNAPSHOT"
 
+scalaVersion := "3.3.0"
+
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
-scalaVersion := "2.13.16"
-
-libraryDependencies += guice
-libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "7.0.1" % Test
+libraryDependencies ++= Seq(
+  guice,
+  "org.apache.pekko" %% "pekko-stream" % "1.0.2"
+)
