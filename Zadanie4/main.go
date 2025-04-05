@@ -1,21 +1,26 @@
 package main
 
 import (
-"fmt"
-"strconv"
-"github.com/labstack/echo/v4"
+    "fmt"
+    "strconv"
+    "github.com/labstack/echo/v4"
+    "gorm.io/driver/sqlite"
+    "gorm.io/gorm"
 )
 
 type Product struct {
-id int
-content string
+    ID      int    `gorm:"primaryKey" json:"id"`
+    Content string `json:"content"`
 }
 
-var products []Product
+var db *gorm.DB
 
 func main() {
-    products = append(products, Product{id: 1, content: "Book"})
-    products = append(products, Product{id: 2, content: "Pen"})
+    db, _ = gorm.Open(sqlite.Open("products.db"), &gorm.Config{})
+    db.AutoMigrate(&Product{})
+
+    db.Create(&Product{ID: 1, Content: "Book"})
+    db.Create(&Product{ID: 2, Content: "Pen"})
 
     e := echo.New()
     e.GET("/products", getProducts)
@@ -29,61 +34,70 @@ func main() {
 
 func createProduct(c echo.Context) error {
     content := c.QueryParam("content")
-    id := len(products) + 1
-    product := Product{id: id, content: content}
-    products = append(products, product)
-    fmt.Printf("Created product: ID=%d, Content=%s\n", product.id, product.content)
+    product := Product{Content: content}
+    if err := db.Create(&product).Error; err != nil {
+        fmt.Println("Error creating product:", err)
+        return nil
+    }
+
+    fmt.Printf("Created product: ID=%d, Content=%s\n", product.ID, product.Content)
     return nil
 }
 
 func getProducts(c echo.Context) error {
+    var products []Product
+    if err := db.Find(&products).Error; err != nil {
+        fmt.Println("Error fetching products:", err)
+        return nil
+    }
+
     for _, product := range products {
-        fmt.Printf("Product ID: %d, Content: %s\n", product.id, product.content)
+        fmt.Printf("Product ID: %d, Content: %s\n", product.ID, product.Content)
     }
     return nil
 }
 
 func getProduct(c echo.Context) error {
     idStr := c.Param("id")
-        id, err := strconv.Atoi(idStr)
-        if err != nil {
-            fmt.Println("Error: Invalid ID")
-            return nil
-        }
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        fmt.Println("Error: Invalid ID")
+        return nil
+    }
 
-        for _, p := range products {
-            if p.id == id {
-                fmt.Printf("Found product: ID=%d, Content=%s\n", p.id, p.content)
-                return nil
-            }
-        }
+    var product Product
+    if err := db.First(&product, id).Error; err != nil {
         fmt.Println("Error: Product not found")
         return nil
+    }
+
+    fmt.Printf("Found product: ID=%d, Content=%s\n", product.ID, product.Content)
+    return nil
 }
 
 func updateProduct(c echo.Context) error {
     idStr := c.Param("id")
-        id, err := strconv.Atoi(idStr)
-        if err != nil {
-            fmt.Println("Error: Invalid ID")
-            return nil
-        }
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        fmt.Println("Error: Invalid ID")
+        return nil
+    }
 
-        content := c.QueryParam("content")
-        if content == "" {
-            fmt.Println("Error: No content provided")
-            return nil
-        }
-
-        for i, p := range products {
-            if p.id == id {
-                products[i].content = content
-                fmt.Printf("Updated product: ID=%d, Content=%s\n", id, content)
-                return nil
-            }
-        }
+    content := c.QueryParam("content")
+    var product Product
+    if err := db.First(&product, id).Error; err != nil {
         fmt.Println("Error: Product not found")
         return nil
+    }
+
+    product.Content = content
+    if err := db.Save(&product).Error; err != nil {
+        fmt.Println("Error updating product:", err)
+        return nil
+    }
+
+    fmt.Printf("Updated product: ID=%d, Content=%s\n", product.ID, product.Content)
+    return nil
 }
 
 func deleteProduct(c echo.Context) error {
@@ -94,15 +108,17 @@ func deleteProduct(c echo.Context) error {
         return nil
     }
 
-    for i, p := range products {
-        if p.id == id {
-            products = append(products[:i], products[i+1:]...)
-            fmt.Printf("Deleted product: ID=%d\n", id)
-            return nil
-        }
+    var product Product
+    if err := db.First(&product, id).Error; err != nil {
+        fmt.Println("Error: Product not found")
+        return nil
     }
-    fmt.Println("Error: Product not found")
+
+    if err := db.Delete(&product).Error; err != nil {
+        fmt.Println("Error deleting product:", err)
+        return nil
+    }
+
+    fmt.Printf("Deleted product: ID=%d\n", id)
     return nil
 }
-
-
